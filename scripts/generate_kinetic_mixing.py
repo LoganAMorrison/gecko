@@ -1,31 +1,29 @@
-import sys
-import os
+# -*- python -*-
 
-import h5py
 import numpy as np
 from rich.progress import Progress
 import argparse
 
+from utils import write_data, parse_json, base_parser
+
 try:
     from gecko import KineticMixingConstraints
-    from gecko.utils import add_to_dataset
 except ImportError:
+    import sys
+
     sys.path.append("..")
     from gecko import KineticMixingConstraints
-    from gecko.utils import add_to_dataset
-
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def generate(filename, mass_ratio, sigmas, overwrite):
+def generate(prefix, filename, mx_min, mx_max, mass_ratio, sigmas, overwrite):
     km = KineticMixingConstraints()
-    mxs = np.geomspace(0.1, 250.0, 100)
-    km_constraints = {}
+    mxs = np.geomspace(mx_min, mx_max, 100)
+    constraints = {"masses": mxs}
     with Progress(transient=True) as progress:
-        km_constraints = km.compute(mxs, mass_ratio, progress=progress, gecco=False)
+        constraints = km.compute(mxs, mass_ratio, progress=progress, gecco=False)
         for sigma in sigmas:
             name = f"gecco-{sigma}sigma"
-            km_constraints[name] = km.compute(
+            constraints[name] = km.compute(
                 mxs,
                 ms_mx_ratio=mass_ratio,
                 sigma=sigma,
@@ -35,97 +33,27 @@ def generate(filename, mass_ratio, sigmas, overwrite):
                 pheno=False,
                 relic_density=False,
             )
-    fname = filename + ".hdf5"
-    if os.path.exists(filename + ".hdf5"):
-        if not overwrite:
-            i = 1
-            while os.path.exists(fname):
-                fname = filename + "-" + str(i) + ".hdf5"
 
-    with h5py.File(fname, "w") as dataset:
-        add_to_dataset(dataset, km_constraints)
-        add_to_dataset(dataset, {"masses": mxs})
+    write_data(prefix, filename, constraints, overwrite)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Compute constraints on the kinetic-mixing dark matter model."
-    )
-    head, _ = os.path.split(THIS_DIR)
-    default_prefix = os.path.join(head, "results")
-    parser.add_argument(
-        "--sigma",
-        dest="sigmas",
-        nargs="+",
-        action="store",
-        metavar="SIGMA",
-        type=int,
-        default=[5, 25],
-        help=" ".join(["Sigma value(s) for discovery limit.", "Default is 5 25."]),
-    )
-    parser.add_argument(
-        "--mass-ratio",
-        dest="mass_ratio",
-        nargs="?",
-        action="store",
-        metavar="RATIO",
-        type=float,
-        default=0.5,
-        help=" ".join(
-            [
-                "ratio of the vector mediator mass to dark-matter mass.",
-                "Default is 3.0.",
-            ]
-        ),
-    )
-    parser.add_argument(
-        "--prefix",
-        dest="prefix",
-        nargs="?",
-        action="store",
-        metavar="PREFIX",
-        type=str,
-        default=default_prefix,
-        help=" ".join(
-            [
-                "absolute path to directory where datafile will be stored.",
-                f"Default is {default_prefix}",
-            ]
-        ),
-    )
-    parser.add_argument(
-        "--file",
-        dest="filename",
-        nargs="?",
-        action="store",
-        metavar="FNAME",
-        type=str,
-        default="kinetic_mixing",
-        help=" ".join(
-            [
-                "Name of the datafile for annihilation constraints.",
-                "Default is 'kinetic_mixing_{mass-ratio}'.",
-            ]
-        ),
-    )
-    parser.add_argument(
-        "--overwrite",
-        dest="overwrite",
-        action="store_const",
-        const=True,
-        default=False,
-        help=" ".join(
-            [
-                "If this flag is given, the file will be over-written",
-                "if it exists.",
-            ]
-        ),
+        prog="generate_kinetic_mixing",
+        description="Compute constraints on the kinetic-mixing model.",
+        parents=[base_parser],
     )
 
-    args = parser.parse_args()
-    filename = os.path.join(args.prefix, args.filename)
-    mass_ratio = args.mass_ratio
-    overwrite = args.overwrite
-    sigmas = args.sigmas
+    extra_required = ["mass-ratio"]
+    extra_optional = {"mx-min": 0.1, "mx-max": 250.0}
+    config = parse_json(parser.parse_args(), extra_required, extra_optional)
 
-    generate(filename, mass_ratio, sigmas, overwrite)
+    generate(
+        config["prefix"],
+        config["filename"],
+        config["mx-min"],
+        config["mx-max"],
+        config["mass-ratio"],
+        config["sigma"],
+        config["overwrite"],
+    )

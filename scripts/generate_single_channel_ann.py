@@ -1,7 +1,5 @@
-import sys
-import os
+# -*- python -*-
 
-import h5py
 import numpy as np
 from rich.progress import Progress
 import argparse
@@ -11,18 +9,18 @@ from hazma.parameters import (
     charged_pion_mass as mpi,
 )
 
+from utils import write_data, parse_json, base_parser
+
 try:
     from gecko import SingleChannelConstraints
-    from gecko.utils import add_to_dataset
 except ImportError:
+    import sys
+
     sys.path.append("..")
     from gecko import SingleChannelConstraints
-    from gecko.utils import add_to_dataset
-
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def generate(filename, sigmas, overwrite):
+def generate(prefix, filename, sigmas, overwrite):
     singlechannel = SingleChannelConstraints()
     masses = {
         "e e": np.geomspace(me, 1e4, 100),
@@ -33,6 +31,7 @@ def generate(filename, sigmas, overwrite):
     constraints = {}
     with Progress(transient=True) as progress:
         for fs, mxs in masses.items():
+            constraints[fs] = {"masses": mxs}
             constraints[fs] = singlechannel.compute(
                 mxs, fs, decay=False, progress=progress, gecco=False
             )
@@ -48,81 +47,21 @@ def generate(filename, sigmas, overwrite):
                     existing=False,
                 )
 
-    fname = filename + ".hdf5"
-    if os.path.exists(filename + ".hdf5"):
-        if not overwrite:
-            i = 1
-            while os.path.exists(fname):
-                fname = filename + "-" + str(i) + ".hdf5"
-
-    with h5py.File(fname, "w") as dataset:
-        add_to_dataset(dataset, constraints)
-        add_to_dataset(dataset, {fs: {"masses": mxs} for fs, mxs in masses.items()})
+    write_data(prefix, filename, constraints, overwrite)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Compute constraints on single-channel dark matter models."
-    )
-    head, _ = os.path.split(THIS_DIR)
-    default_prefix = os.path.join(head, "results")
-    parser.add_argument(
-        "--sigma",
-        dest="sigmas",
-        nargs="+",
-        action="store",
-        metavar="SIGMA",
-        type=int,
-        default=[5, 25],
-        help=" ".join(["Sigma value(s) for discovery limit.", "Default is 5 25."]),
-    )
-    parser.add_argument(
-        "--prefix",
-        dest="prefix",
-        nargs="?",
-        action="store",
-        metavar="PREFIX",
-        type=str,
-        default=default_prefix,
-        help=" ".join(
-            [
-                "absolute path to directory where datafile will be stored.",
-                f"Default is {default_prefix}",
-            ]
-        ),
-    )
-    parser.add_argument(
-        "--filename",
-        dest="filename",
-        nargs="?",
-        action="store",
-        metavar="FILENAME",
-        type=str,
-        default="single_channel_ann",
-        help=" ".join(
-            [
-                "Name of the datafile for annihilation constraints.",
-                "Default is 'singal_channel_ann'.",
-            ]
-        ),
-    )
-    parser.add_argument(
-        "--overwrite",
-        dest="overwrite",
-        action="store_const",
-        const=True,
-        default=False,
-        help=" ".join(
-            [
-                "If this flag is given, the file will be over-written",
-                "if it exists.",
-            ]
-        ),
+        prog="generate_single_channel_ann",
+        description="Compute constraints on the single-channel annihilation model.",
+        parents=[base_parser],
     )
 
-    args = parser.parse_args()
-    filename = os.path.join(args.prefix, args.filename)
-    sigmas = args.sigmas
-    overwrite = args.overwrite
+    config = parse_json(parser.parse_args())
 
-    generate(filename, sigmas, overwrite)
+    generate(
+        config["prefix"],
+        config["filename"],
+        config["sigma"],
+        config["overwrite"],
+    )

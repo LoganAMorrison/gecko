@@ -1,0 +1,8 @@
+{
+  "lepton": "rh-neutrino",
+  "mx-min": 0.1,
+  "mx-max": 250.0,
+  "filename": "rhn_e",
+  "sigma": [5.0, 25.0],
+  "overwrite": false
+}

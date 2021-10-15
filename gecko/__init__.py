@@ -8,6 +8,7 @@ import hazma.gamma_ray_parameters as _grp
 import hazma.single_channel as _single_channel
 from hazma.vector_mediator import KineticMixing
 from hazma.scalar_mediator import HiggsPortal
+from hazma.rh_neutrino import RHNeutrino
 from rich.progress import Progress, TaskID
 
 
@@ -630,6 +631,98 @@ class KineticMixingConstraints:
             )
             constraints["relic-density"] = rd_constrainer.constrain(
                 model_iterator, progress_task
+            )
+
+        return constraints
+
+
+class RHNeutrinoConstraints:
+    """
+    Class for computing the constraints on the RH-neutrino model
+    from existing gamma-ray telescopes and the GECCO telescope.
+    """
+
+    def __init__(self):
+        self._gecco_targets = gecco_decay_targets()
+        self._task_names = ["telescopes"]
+
+    def _update(self, model: RHNeutrino, mx):
+        model.mx = mx
+
+    def _model_iterator(
+        self,
+        mxs: npt.NDArray[np.float64],
+        stheta: float = 1e-3,
+        lepton: str = "e",
+    ):
+        base = RHNeutrino(1, stheta, lepton=lepton)
+        up = lambda model, mx: self._update(model, mx)
+        return iterators.ModelIterator(base).iterate(up, mxs)
+
+    def _progress_task(
+        self, desc: str, progress: Optional[Progress] = None, total: int = 0
+    ):
+        if progress is not None:
+            header = f"RH-Neutrino {desc}"
+            progress_task = (
+                progress,
+                progress.add_task(header, total=total),
+            )
+        else:
+            progress_task = None
+        return progress_task
+
+    def compute(
+        self,
+        mxs: npt.NDArray[np.float64],
+        existing: bool = True,
+        gecco: bool = True,
+        progress: Optional[Progress] = None,
+        **options,
+    ):
+        """
+        Compute the constraints on a RH-Neutrino dark matter model. The observations
+        used to constrain are: COMPTEL, EGRET, Fermi, INTEGRAL and GECCO.
+
+        Parameters
+        ----------
+        mxs: ArrayLike
+            Array of dark-matter masses.
+        existing: bool, optional
+            If true, constraints from existing telescopes are computed. Default is True.
+        gecco: bool, optional
+            If true, constraints from GECCO are computed. Default is True.
+        progress: rich.progress.Progress or None, optional
+            Rich progress-bar to display progress.
+        options
+            Options to pass to various constrainers. These options are listed below.
+        sigma: float, optional
+            Discovery threshold for GECCO corresponding to a singal-to-noise ratio
+            greater than `sigma`. Default is 5.0.
+        lepton: str, optional
+            Lepton flavor the RH-neutrino mixes with. Can be "e" or "mu".
+            Default is "e".
+
+        Returns
+        -------
+        constraints: Dict
+            Dictionary containing all constraints.
+        """
+        stheta = options.get("stheta", 1e-3)
+        lepton = options.get("lepton", "e")
+        model_iterator = self._model_iterator(mxs, stheta=stheta, lepton=lepton)
+        constraints = {}
+
+        if existing or gecco:
+            progress_task = self._progress_task("telescopes", progress, len(mxs))
+            constraints = astro_constraints(
+                model_iterator,
+                self._gecco_targets,
+                cmb=False,
+                existing=existing,
+                gecco=gecco,
+                progress_task=progress_task,
+                **options,
             )
 
         return constraints

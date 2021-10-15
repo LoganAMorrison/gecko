@@ -7,31 +7,28 @@ import argparse
 from utils import write_data, parse_json, base_parser
 
 try:
-    from gecko import HiggsPortalConstraints
+    from gecko import RHNeutrinoConstraints
 except ImportError:
     import sys
 
     sys.path.append("..")
-    from gecko import HiggsPortalConstraints
+    from gecko import RHNeutrinoConstraints
 
 
-def generate(prefix, filename, mx_min, mx_max, mass_ratio, sigmas, overwrite):
-    hp = HiggsPortalConstraints()
+def generate(prefix, filename, mx_min, mx_max, lepton, sigmas, overwrite):
+    rhn = RHNeutrinoConstraints()
     mxs = np.geomspace(mx_min, mx_max, 100)
     constraints = {"masses": mxs}
     with Progress(transient=True) as progress:
-        constraints = hp.compute(mxs, mass_ratio, progress=progress, gecco=False)
+        constraints = rhn.compute(mxs, lepton=lepton, progress=progress, gecco=False)
         for sigma in sigmas:
             name = f"gecco-{sigma}sigma"
-            constraints[name] = hp.compute(
+            constraints[name] = rhn.compute(
                 mxs,
-                ms_mx_ratio=mass_ratio,
                 sigma=sigma,
+                lepton=lepton,
                 progress=progress,
-                cmb=False,
                 existing=False,
-                pheno=False,
-                relic_density=False,
             )
 
     write_data(prefix, filename, constraints, overwrite)
@@ -39,12 +36,12 @@ def generate(prefix, filename, mx_min, mx_max, mass_ratio, sigmas, overwrite):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog="generate_higgs_portal",
-        description="Compute constraints on the Higgs-portal model.",
+        prog="generate_rh_neutrino",
+        description="Compute constraints on the kinetic-mixing model.",
         parents=[base_parser],
     )
 
-    extra_required = ["mass-ratio"]
+    extra_required = ["lepton"]
     extra_optional = {"mx-min": 0.1, "mx-max": 250.0}
     config = parse_json(parser.parse_args(), extra_required, extra_optional)
 
@@ -53,7 +50,7 @@ if __name__ == "__main__":
         config["filename"],
         config["mx-min"],
         config["mx-max"],
-        config["mass-ratio"],
+        config["lepton"],
         config["sigma"],
         config["overwrite"],
     )

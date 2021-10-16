@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 
 from hazma.cmb import vx_cmb
 from hazma.scalar_mediator import HiggsPortal
-from hazma.parameters import sv_inv_MeV_to_cm3_per_s
 
 from mpl_conf import COLOR_DICT as color_dict
 from mpl_conf import LABEL_DICT as label_dict
@@ -16,6 +15,8 @@ import mpl_conf
 try:
     from gecko.utils import sigmav
 except ImportError:
+    import sys
+
     sys.path.append("..")
     from gecko.utils import sigmav
 
@@ -28,16 +29,17 @@ YLABEL = SIGV_TEX + r"$ \ $" + SIGV_UNITS
 XLABEL = r"$m_{\chi}$" + r"$ \ $" + MEV_UNITS
 
 
-def add_gecco(axis, masses, data_low, data_high):
-    for key in data_low.keys():
+def add_gecco(axis, masses, datafile):
+    gecco = datafile["gecco"]
+    for key in gecco.keys():
         conf = {"color": color_dict[key]}
-        low = data_low[key][:]
-        high = data_high[key][:]
-        avg = np.exp(np.log(high * low) / 2.0)
-        axis.fill_between(masses, high, low, lw=1, alpha=0.2, **conf)
+        c1 = gecco[key]["limits"][0, :]
+        c2 = gecco[key]["limits"][1, :]
+        avg = np.exp(np.log(c1 * c2) / 2.0)
+        axis.fill_between(masses, c1, c2, lw=1, alpha=0.2, **conf)
         axis.plot(masses, avg, lw=2.5, **conf)
-        axis.plot(masses, high, lw=1.5, alpha=0.3, ls="-", **conf)
-        axis.plot(masses, low, lw=1.5, alpha=0.3, ls="-", **conf)
+        axis.plot(masses, c1, lw=1.5, alpha=0.3, ls="-", **conf)
+        axis.plot(masses, c2, lw=1.5, alpha=0.3, ls="-", **conf)
 
 
 def add_cmb(axis, masses, datafile):
@@ -89,8 +91,6 @@ def add_gsxx_contour(axis, datafile, ms_mx_ratio, gsxx, vx=1e-3, stheta=1e-3):
 
 def add_plot(axis, datafile, ylims, include_pheno=False):
     masses = datafile["masses"][:]
-    gecco5 = datafile["gecco-5sigma"]
-    gecco25 = datafile["gecco-25sigma"]
 
     if include_pheno:
         add_pheno(axis, masses, datafile)
@@ -98,7 +98,7 @@ def add_plot(axis, datafile, ylims, include_pheno=False):
     add_cmb(axis, masses, datafile)
     add_rd(axis, masses, datafile)
     add_existing(axis, masses, ylims, datafile)
-    add_gecco(axis, masses, gecco25, gecco5)
+    add_gecco(axis, masses, datafile)
 
     axis.set_yscale("log")
     axis.set_xscale("log")
@@ -135,7 +135,7 @@ if __name__ == "__main__":
 
     add_gsxx_contour(ax2, DATAFILE_1_5, 1.5, 4 * np.pi, vx=1e-3, stheta=1)
 
-    gecco5 = DATAFILE_0_5["gecco-5sigma"]
+    gecco = DATAFILE_0_5["gecco"]
 
     ax3.clear()
     ax3.set_axis_off()
@@ -145,7 +145,7 @@ if __name__ == "__main__":
         Patch(color=color_dict["existing"], label=label_dict["existing"], alpha=0.3),
         Patch(color=color_dict["pheno"], label=label_dict["pheno"], alpha=0.3),
     ]
-    for key in gecco5.keys():
+    for key in gecco.keys():
         handels += [
             Patch(color=color_dict[key], label="GECCO" + label_dict[key], alpha=0.7)
         ]

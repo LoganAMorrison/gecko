@@ -655,7 +655,7 @@ class RHNeutrinoConstraints:
         stheta: float = 1e-3,
         lepton: str = "e",
     ):
-        base = RHNeutrino(1, stheta, lepton=lepton)
+        base = RHNeutrino(1, stheta, lepton=lepton, include_3body=True)
         up = lambda model, mx: self._update(model, mx)
         return iterators.ModelIterator(base).iterate(up, mxs)
 

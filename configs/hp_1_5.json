@@ -1,0 +1,9 @@
+{
+  "model": "higgs-portal",
+  "mass-ratio": 1.5,
+  "mx-min": 0.1,
+  "mx-max": 250.0,
+  "filename": "higgs_portal_1_5",
+  "sigma": [5.0, 25.0],
+  "overwrite": false
+}

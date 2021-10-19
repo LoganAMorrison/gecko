@@ -62,8 +62,8 @@ def parse_json(args):
             conf[key] = config[key]
 
     # These are optional
-    conf["mx-min"] = 0.1
-    conf["mx-max"] = 250.0
+    conf["mx-min"] = config.get("mx-min", 0.1)
+    conf["mx-max"] = config.get("mx-max", 250.0)
     conf["prefix"] = config.get("prefix", default_prefix)
     conf["sigma"] = config.get("sigma", [5.0, 25.0])
     conf["overwrite"] = config.get("overwrite", False)
@@ -169,10 +169,10 @@ def single_channel(decay, prefix, filename, sigmas, overwrite):
     constraints = {}
     with Progress(transient=True) as progress:
         for fs, mxs in masses.items():
-            constraints[fs] = {"masses": mxs}
             constraints[fs] = singlechannel.compute(
                 mxs, fs, decay=decay, progress=progress, gecco=False, cmb=cmb
             )
+            constraints[fs]["masses"] = mxs
             targets = gecco_targets_dec() if decay else gecco_targets_ann()
             constraints[fs]["gecco"] = {
                 key: {

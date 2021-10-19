@@ -2,8 +2,6 @@ import h5py
 import numpy as np
 import warnings
 
-# from matplotlib.lines import Line2D
-# from matplotlib.patches import Patch
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
@@ -12,17 +10,9 @@ from hazma.rh_neutrino import RHNeutrino
 
 from mpl_conf import COLOR_DICT as color_dict
 from mpl_conf import LABEL_DICT as label_dict
-from mpl_conf import SIGV_TEX, SIGV_UNITS, MEV_UNITS
 import mpl_conf
 
 Group = h5py.Group
-
-
-DATAFILE_E: Group = h5py.File("../results/rhn_e.hdf5", "r")
-DATAFILE_M: Group = h5py.File("../results/rhn_mu.hdf5", "r")
-
-YLABEL = SIGV_TEX + r"$ \ $" + SIGV_UNITS
-XLABEL = r"$m_{\chi}$" + r"$ \ $" + MEV_UNITS
 
 
 def add_gecco(axis, masses, gecco):
@@ -64,6 +54,17 @@ def add_theta_contour(axis, datafile, theta, lepton):
     axis.plot(masses, taus, ls="-.", color=mpl_conf.PURPLE, alpha=0.5, lw=1)
 
 
+def add_theta_label(axis, x, y, p):
+    axis.text(
+        x,
+        y,
+        r"$\theta=10^{" + str(p) + r"}$",
+        fontsize=7,
+        rotation=-70,
+        color=mpl_conf.PURPLE,
+    )
+
+
 def add_plot(axis, datafile, ylims):
     masses = datafile["masses"][:]
     gecco = datafile["gecco"]
@@ -99,80 +100,29 @@ if __name__ == "__main__":
     fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, dpi=150, figsize=(8, 4))
     ylims = (1e21, 1e29)
 
+    DATAFILE_E: Group = h5py.File("results/rhn_e.hdf5", "r")
+    DATAFILE_M: Group = h5py.File("results/rhn_mu.hdf5", "r")
+
+    YLABEL = mpl_conf.TAU_TEX
+    XLABEL = mpl_conf.RHN_MASS_TEX
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
-        add_theta_contour(ax1, DATAFILE_E, 1e-18, "e")
-        ax1.text(
-            170,
-            1e27,
-            r"$\theta=10^{-18}$",
-            fontsize=7,
-            rotation=-70,
-            color=mpl_conf.PURPLE,
-        )
-        add_theta_contour(ax1, DATAFILE_E, 1e-16, "e")
-        ax1.text(
-            40,
-            1e27,
-            r"$\theta=10^{-16}$",
-            fontsize=7,
-            rotation=-70,
-            color=mpl_conf.PURPLE,
-        )
-        add_theta_contour(ax1, DATAFILE_E, 1e-14, "e")
-        add_theta_contour(ax1, DATAFILE_E, 1e-12, "e")
-        add_theta_contour(ax1, DATAFILE_E, 1e-10, "e")
-        add_theta_contour(ax1, DATAFILE_E, 1e-8, "e")
-        add_plot(ax1, DATAFILE_E, ylims)
         add_gecco_legend(ax1, DATAFILE_E["gecco"])
 
-        add_theta_contour(ax2, DATAFILE_M, 1e-18, "mu")
-        ax2.text(
-            170,
-            1e27,
-            r"$\theta=10^{-18}$",
-            fontsize=7,
-            rotation=-70,
-            color=mpl_conf.PURPLE,
-        )
-        add_theta_contour(ax2, DATAFILE_M, 1e-16, "mu")
-        ax2.text(
-            40,
-            1e27,
-            r"$\theta=10^{-16}$",
-            fontsize=7,
-            rotation=-70,
-            color=mpl_conf.PURPLE,
-        )
-        add_theta_contour(ax2, DATAFILE_M, 1e-14, "mu")
-        ax2.text(
-            7,
-            1e27,
-            r"$\theta=10^{-14}$",
-            fontsize=7,
-            rotation=-70,
-            color=mpl_conf.PURPLE,
-        )
-        add_theta_contour(ax2, DATAFILE_M, 1e-12, "mu")
-        ax2.text(
-            1,
-            1e27,
-            r"$\theta=10^{-12}$",
-            fontsize=7,
-            rotation=-70,
-            color=mpl_conf.PURPLE,
-        )
-        add_theta_contour(ax2, DATAFILE_M, 1e-10, "mu")
-        ax2.text(
-            0.17,
-            1e27,
-            r"$\theta=10^{-10}$",
-            fontsize=7,
-            rotation=-70,
-            color=mpl_conf.PURPLE,
-        )
-        add_theta_contour(ax2, DATAFILE_M, 1e-8, "mu")
+        text_xs = [170, 40, 7, 1, 0.17]
+        text_ys = [1e27, 1e27, 1e27, 1e27, 1e27]
+        pows = [-18, -16, -14, -12, -10]
+
+        for x, y, p in zip(text_xs, text_ys, pows):
+            add_theta_contour(ax1, DATAFILE_E, 10 ** p, "e")
+            if p < -15:
+                add_theta_label(ax1, x, y, p)
+            add_theta_contour(ax2, DATAFILE_M, 10 ** p, "mu")
+            add_theta_label(ax2, x, y, p)
+
+        add_plot(ax1, DATAFILE_E, ylims)
         add_plot(ax2, DATAFILE_M, ylims)
 
     ax1.set_ylabel(YLABEL, fontdict={"size": 16})
@@ -188,4 +138,7 @@ if __name__ == "__main__":
     ax2.grid(True, axis="x", which="major")
 
     plt.tight_layout()
-    plt.savefig("rhn.pdf")
+    plt.savefig("figures/rhn.pdf")
+
+    DATAFILE_E.close()
+    DATAFILE_M.close()

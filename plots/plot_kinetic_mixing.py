@@ -11,12 +11,7 @@ from mpl_conf import LABEL_DICT as label_dict
 from mpl_conf import SIGV_TEX, SIGV_UNITS, MEV_UNITS
 import mpl_conf
 
-Group = h5py._hl.group.Group
-
-DATAFILE: Group = h5py.File("../results/kinetic_mixing.hdf5", "r")
-
-YLABEL = SIGV_TEX + r"$ \ $" + SIGV_UNITS
-XLABEL = r"$m_{\chi}$" + r"$ \ $" + MEV_UNITS
+Group = h5py._hl.group.Group  # type: ignore
 
 
 def add_gecco(masses, gecco):
@@ -55,6 +50,10 @@ def make_legend_axis(geccos, existing, pheno, cmb):
 
 if __name__ == "__main__":
     fig = plt.figure(dpi=150, figsize=(8, 4.5))
+
+    DATAFILE: Group = h5py.File("results/kinetic_mixing.hdf5", "r")
+    YLABEL = SIGV_TEX + r"$ \ $" + SIGV_UNITS
+    XLABEL = r"$m_{\chi}$" + r"$ \ $" + MEV_UNITS
 
     masses = DATAFILE["masses"][:]
     egret = DATAFILE["egret"][:]
@@ -105,4 +104,4 @@ if __name__ == "__main__":
     plt.legend(handles=handels, bbox_to_anchor=(1.0, 0.75), fontsize=12)
 
     plt.tight_layout()
-    plt.savefig("kinetic_mixing.pdf")
+    plt.savefig("figures/kinetic_mixing.pdf")

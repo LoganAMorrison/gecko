@@ -6,7 +6,7 @@ authors = ["Logan A. Morrison <loganmorrison99@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.7,<3.10"
-hazma = {git="https://github.com/LoganAMorrison/Hazma.git", rev="d2d0e14"}
+hazma = {git="https://github.com/LoganAMorrison/Hazma.git"}
 Cython = "^0.29.24"
 numpy = "^1.21.2"
 scipy = "^1.7.1"

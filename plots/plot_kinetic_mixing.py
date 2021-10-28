@@ -6,19 +6,19 @@ import matplotlib.pyplot as plt
 
 from hazma.parameters import electron_mass as me
 
-from mpl_conf import COLOR_DICT as color_dict
-from mpl_conf import LABEL_DICT as label_dict
-from mpl_conf import SIGV_TEX, SIGV_UNITS, MEV_UNITS
-import mpl_conf
+from utils import COLOR_DICT as color_dict
+from utils import LABEL_DICT as label_dict
+from utils import SIGV_TEX, SIGV_UNITS, MEV_UNITS
+import utils
 
 Group = h5py._hl.group.Group  # type: ignore
 
 
-def add_gecco(masses, gecco):
-    for key in gecco.keys():
-        conf = {"color": color_dict[key]}
-        c1 = gecco[key]["limits"][0, :]
-        c2 = gecco[key]["limits"][1, :]
+def add_gecco(masses, datafile):
+    for key in utils.get_gecco_keys(datafile):
+        conf = {"color": color_dict[utils.strip_gecco(key)]}
+        c1 = datafile[key][:]
+        c2 = 5 * datafile[key][:]
         avg = np.exp(np.log(c1 * c2) / 2.0)
         plt.fill_between(masses, c1, c2, lw=1, alpha=0.2, **conf)
         plt.plot(masses, avg, lw=2.5, **conf)
@@ -31,25 +31,33 @@ def add_cmb(axis, data):
         axis.plot(1e3 * data.T[0], data.T[1], lw=1, ls="--", c="k")
 
 
-def make_legend_axis(geccos, existing, pheno, cmb):
-    handels = []
-    for key in geccos:
+def make_legend_axis(datafile):
+    handels = [
+        Line2D([0], [0], color="k", label=label_dict["cmb"], ls="--", lw=1),
+        Line2D([0], [0], color="k", label=label_dict["rd"], ls="dotted", lw=1),
+    ]
+    for key in utils.get_gecco_keys(datafile):
+        name = utils.strip_gecco(key)
         handels += [
-            Patch(color=color_dict[key], label="GECCO" + label_dict[key], alpha=0.7)
+            Line2D(
+                [0],
+                [0],
+                color=color_dict[name],
+                label="GECCO" + label_dict[name],
+                alpha=1.0,
+            )
         ]
-    if cmb is not None:
-        handels += [Line2D([0], [0], color="k", label=label_dict[cmb], ls="--", lw=1)]
-    if existing is not None:
-        handels += [
-            Patch(color=color_dict[existing], label=label_dict[existing], alpha=0.3)
-        ]
-    if pheno is not None:
-        handels += [Patch(color=color_dict[pheno], label=label_dict[pheno], alpha=0.3)]
-    plt.legend(handles=handels, bbox_to_anchor=(1.0, 1.0), fontsize=12)
+    handels += [
+        Patch(color=color_dict["pheno"], label=label_dict["pheno"], alpha=0.3),
+    ]
+    handels += [
+        Patch(color=color_dict["existing"], label=label_dict["existing"], alpha=0.3),
+    ]
+    plt.legend(handles=handels, bbox_to_anchor=(1.0, 0.75), fontsize=12)
 
 
 if __name__ == "__main__":
-    fig = plt.figure(dpi=150, figsize=(8, 4.5))
+    fig, axis = plt.subplots(dpi=150, figsize=(8, 4.5))
 
     DATAFILE: Group = h5py.File("results/kinetic_mixing.hdf5", "r")
     YLABEL = SIGV_TEX + r"$ \ $" + SIGV_UNITS
@@ -60,7 +68,6 @@ if __name__ == "__main__":
     comptel = DATAFILE["comptel"][:]
     fermi = DATAFILE["fermi"][:]
     integral = DATAFILE["integral"][:]
-    gecco = DATAFILE["gecco"]
     cmb = DATAFILE["cmb"][:]
     pheno = DATAFILE["pheno"][:]
     rd = DATAFILE["relic-density"][:]
@@ -72,36 +79,33 @@ if __name__ == "__main__":
         [np.min([e, c, f, i]) for e, c, f, i in zip(egret, comptel, fermi, integral)]
     )
     existing = np.clip(existing, ymin, ymax)
-    plt.fill_between(masses, existing, ymax, alpha=0.2, color=mpl_conf.BLUE)
-    plt.plot(masses, existing, color=mpl_conf.BLUE)
+    axis.fill_between(masses, existing, ymax, alpha=0.2, color=utils.BLUE)
+    axis.plot(masses, existing, color=utils.BLUE)
 
-    plt.fill_between(masses, pheno, existing, alpha=0.2, color=mpl_conf.ORANGE)
-    plt.plot(masses, pheno, alpha=0.2, ls="--", color=mpl_conf.ORANGE)
+    axis.fill_between(masses, pheno, existing, alpha=0.2, color=utils.ORANGE)
+    axis.plot(masses, pheno, alpha=0.2, ls="--", color=utils.ORANGE)
 
-    add_gecco(masses, gecco)
+    # add_gecco(masses, DATAFILE)
+    utils.add_gecco(axis, masses, DATAFILE)
 
-    plt.plot(masses, cmb, ls="--", c="k")
-    plt.plot(masses, rd, ls="dotted", c="k", lw=1)
+    axis.plot(masses, cmb, ls="--", c="k")
+    axis.plot(masses, rd, ls="dotted", c="k", lw=1)
 
-    plt.yscale("log")
-    plt.xscale("log")
-    plt.ylim([ymin, ymax])
-    plt.xlim([me * 1.12, np.max(masses)])
+    make_legend_axis(DATAFILE)
 
-    plt.ylabel(YLABEL, fontdict={"size": 16})
-    plt.xlabel(XLABEL, fontdict={"size": 16})
+    axis.set_yscale("log")
+    axis.set_xscale("log")
+    axis.set_title(r"$m_{\chi} = m_{V}/3$", fontdict={"size": 16})
+    axis.set_ylim([ymin, ymax])
+    axis.set_xlim([me * 1.12, np.max(masses)])
 
-    handels = [
-        Line2D([0], [0], color="k", label=label_dict["cmb"], ls="--", lw=1),
-        Line2D([0], [0], color="k", label=label_dict["rd"], ls="dotted", lw=1),
-        Patch(color=color_dict["existing"], label=label_dict["existing"], alpha=0.3),
-        Patch(color=color_dict["pheno"], label=label_dict["pheno"], alpha=0.3),
-    ]
-    for key in gecco.keys():
-        handels += [
-            Patch(color=color_dict[key], label="GECCO" + label_dict[key], alpha=0.7)
-        ]
-    plt.legend(handles=handels, bbox_to_anchor=(1.0, 0.75), fontsize=12)
+    axis.set_ylabel(YLABEL, fontdict={"size": 16})
+    axis.set_xlabel(XLABEL, fontdict={"size": 16})
+
+    axis.set_yticks([10.0 ** x for x in range(-33, -22)])
+
+    utils.configure_ticks(axis)
+    utils.add_xy_grid(axis)
 
     plt.tight_layout()
     plt.savefig("figures/kinetic_mixing.pdf")

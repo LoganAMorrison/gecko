@@ -1,6 +1,14 @@
 {
-  "model": "single-channel-ann",
+  "decay": false,
+  "channels": [
+    "e e",
+    "mu mu",
+    "g g"
+  ],
+  "min-mx": 0.1,
+  "max-mx": 1e4,
+  "num-mx": 100,
   "filename": "single_channel_ann",
-  "sigma": [5.0, 25.0],
+  "sigma": 5.0,
   "overwrite": false
 }

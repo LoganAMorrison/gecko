@@ -5,13 +5,14 @@ description = ""
 authors = ["Logan A. Morrison <loganmorrison99@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.7,<3.10"
-hazma = {git="https://github.com/LoganAMorrison/Hazma.git"}
+python = ">=3.7.1,<3.10"
 Cython = "^0.29.24"
 numpy = "^1.21.2"
 scipy = "^1.7.1"
 rich = "^10.12.0"
 h5py = "^3.4.0"
+hazma = {git="https://github.com/LoganAMorrison/Hazma.git"}
+pandas = "^1.3.4"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

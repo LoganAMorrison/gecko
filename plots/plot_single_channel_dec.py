@@ -7,11 +7,11 @@ import matplotlib.pyplot as plt
 
 from hazma.parameters import muon_mass as mmu
 
-from mpl_conf import COLOR_DICT as color_dict
-from mpl_conf import LABEL_DICT as label_dict
-from mpl_conf import EXISTINGS
-from mpl_conf import GECCO_DECS
-from mpl_conf import BR_TEX, SIGV_TEX, SIGV_UNITS, DM_MASS_TEX
+import utils
+from utils import COLOR_DICT as color_dict
+from utils import LABEL_DICT as label_dict
+from utils import EXISTINGS
+from utils import DM_MASS_TEX
 
 Group = h5py._hl.group.Group  # type: ignore
 
@@ -20,16 +20,24 @@ cmb_epem = np.genfromtxt("data/cmb_epem.csv", delimiter=",")
 cmb_gg = np.genfromtxt("data/cmb_gamma_gamma.csv", delimiter=",")
 
 
-def add_gecco(axis, masses, data_low, data_high):
-    for key in data_low.keys():
-        conf = {"color": color_dict[key]}
-        low = 1.0 / data_high[key][:]
-        high = 1.0 / data_low[key][:]
-        avg = np.exp(np.log(high * low) / 2.0)
-        axis.fill_between(masses, high, low, lw=1, alpha=0.2, **conf)
+def get_gecco_keys(datafile):
+    return list(filter(lambda k: "gecco" in k, list(datafile.keys())))
+
+
+def strip_gecco(key: str):
+    return key.replace("gecco-", "")
+
+
+def add_gecco(axis, masses, datafile):
+    for key in get_gecco_keys(datafile):
+        conf = {"color": color_dict[strip_gecco(key)]}
+        c1 = 1 / datafile[key][:]
+        c2 = 1 / (5 * datafile[key][:])
+        avg = np.exp(np.log(c1 * c2) / 2.0)
+        axis.fill_between(masses, c1, c2, lw=1, alpha=0.2, **conf)
         axis.plot(masses, avg, lw=2.5, **conf)
-        axis.plot(masses, high, lw=1.5, alpha=0.3, ls="-", **conf)
-        axis.plot(masses, low, lw=1.5, alpha=0.3, ls="-", **conf)
+        axis.plot(masses, c1, lw=1.5, alpha=0.3, ls="-", **conf)
+        axis.plot(masses, c2, lw=1.5, alpha=0.3, ls="-", **conf)
 
 
 def add_existing(axis, masses, data):
@@ -62,17 +70,23 @@ def configure_axis(xlabel, ylabel, xlims, ylims, yscale, xscale, title):
         axis.set_title(title, fontsize=16)
 
 
-def make_legend_axis(axis, geccos, existings, cmbs):
+def make_legend_axis(axis, datafile, cmbs):
     axis.clear()
     axis.set_axis_off()
     handels = []
-    for key in geccos:
-        handels += [
-            Patch(color=color_dict[key], label="GECCO" + label_dict[key], alpha=0.7)
-        ]
     for cmb in cmbs:
         handels += [Line2D([0], [0], color="k", label=label_dict[cmb], ls="--", lw=1)]
-    for key in existings:
+    for key in get_gecco_keys(datafile):
+        name = strip_gecco(key)
+        handels += [
+            Line2D(
+                [0],
+                [0],
+                color=color_dict[name],
+                label="GECCO" + label_dict[name],
+            )
+        ]
+    for key in ["egret", "integral", "fermi", "comptel"]:
         handels += [Patch(color=color_dict[key], label=label_dict[key], alpha=0.3)]
     axis.legend(handles=handels, loc="center", fontsize=12)
 
@@ -84,7 +98,7 @@ if __name__ == "__main__":
     fig.dpi = 150
 
     DATAFILE = h5py.File("results/single_channel_dec.hdf5", "r")
-    YLABEL = BR_TEX + r"\times" + SIGV_TEX + r"$ \ $" + SIGV_UNITS
+    YLABEL = r"$\mathrm{DM} \ \mathrm{lifetime} \ \tau \ [\mathrm{s}]$"
     XLABEL = DM_MASS_TEX
 
     axes = [ax1, ax2, ax3]
@@ -99,9 +113,7 @@ if __name__ == "__main__":
     for i, (channel, axis) in enumerate(zip(DATAFILE.keys(), axes)):
         group: Group = DATAFILE[channel]
         masses = group["masses"][:]
-        gecco5 = group["gecco-5sigma"]
-        gecco25 = group["gecco-25sigma"]
-        add_gecco(axis, masses, gecco25, gecco5)
+        utils.add_gecco(axis, masses, group, decay=True)
         add_existing(axis, masses, group)
         add_cmb(axis, cmbs[i])
         configure_axis(
@@ -114,6 +126,6 @@ if __name__ == "__main__":
             titles[i],
         )
 
-    make_legend_axis(last_axis, GECCO_DECS, EXISTINGS, ["cmb"])
+    make_legend_axis(last_axis, DATAFILE["e e"], ["cmb"])
     plt.tight_layout()
     plt.savefig("figures/single_channel_dec.pdf")

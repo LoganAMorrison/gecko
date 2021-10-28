@@ -15,29 +15,24 @@ from hazma.parameters import (
 )
 
 
-from . import HiggsPortalConstraints
-from . import KineticMixingConstraints
-from . import RHNeutrinoConstraints
-from . import SingleChannelConstraints
-from .gecco import (
-    decay_targets as gecco_targets_dec,
-    annihilation_targets as gecco_targets_ann,
-)
+from .higgs_portal import HiggsPortalConstrainer
+from .kinetic_mixing import KineticMixingConstrainer
+from .rh_neutrino import RHNeutrinoConstrainer
+from .single_channel import SingleChannelConstrainer
+from .pbh import PbhConstrainer
 
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
 head, _ = os.path.split(this_dir)
 default_prefix = os.path.join(head, "results")
 
-model_dispatch = {
-    "higgs-portal": HiggsPortalConstraints(),
-    "kinetic-mixing": KineticMixingConstraints(),
-    "rh-neutrino": RHNeutrinoConstraints(),
-    "single-channel-ann": SingleChannelConstraints(),
-    "single-channel-dec": SingleChannelConstraints(),
-}
+parser = argparse.ArgumentParser(
+    prog="generate",
+    description="Compute constraints on the Higgs-portal model.",
+)
+parser.add_argument("config", help="path to json file containing config.")
 
-
+"""
 def parse_json(args):
     with open(args.config, "r") as f:
         config = json.load(f)
@@ -54,6 +49,31 @@ def parse_json(args):
 
     if config["model"] == "rh-neutrino":
         required += ["lepton"]
+
+    for key in required:
+        if key not in config:
+            raise ValueError(f"Config is required to specify {key}.")
+        else:
+            conf[key] = config[key]
+
+    # These are optional
+    conf["mx-min"] = config.get("mx-min", 0.1)
+    conf["mx-max"] = config.get("mx-max", 250.0)
+    conf["prefix"] = config.get("prefix", default_prefix)
+    conf["sigma"] = config.get("sigma", [5.0, 25.0])
+    conf["overwrite"] = config.get("overwrite", False)
+
+    return conf
+"""
+
+
+def parse_json(args, requires):
+    with open(args.config, "r") as f:
+        config = json.load(f)
+    conf = {}
+
+    required = ["filename"]
+    required.append(requires)
 
     for key in required:
         if key not in config:
@@ -99,10 +119,14 @@ def write_data(prefix: str, filename: str, dataset: Dict, overwrite: bool):
 def simplified_model(
     model, prefix, filename, mx_min, mx_max, mass_ratio, sigmas, overwrite
 ):
-    simp = model_dispatch[model]
+    if model == "kinetic_mixing":
+        simp = KineticMixingConstrainer()
+    else:
+        simp = HiggsPortalConstrainer()
+
     mxs = np.geomspace(mx_min, mx_max, 100)
     with Progress(transient=True) as progress:
-        constraints = simp.compute(mxs, mass_ratio, progress=progress, gecco=False)
+        constraints = simp.constrain(mxs, mass_ratio, progress=progress, gecco=False)
         constraints["masses"] = mxs
         constraints["gecco"] = {
             key: {
@@ -112,7 +136,7 @@ def simplified_model(
             for key in simp._gecco_targets.keys()
         }
         for sigma in sigmas:
-            geccos_ = simp.compute(
+            geccos_ = simp.constrain(
                 mxs,
                 ms_mx_ratio=mass_ratio,
                 sigma=sigma,
@@ -130,10 +154,10 @@ def simplified_model(
 
 
 def rh_neutrino(prefix, filename, mx_min, mx_max, lepton, sigmas, overwrite):
-    rhn = RHNeutrinoConstraints()
+    rhn = RHNeutrinoConstrainer()
     mxs = np.geomspace(mx_min, mx_max, 100)
     with Progress(transient=True) as progress:
-        constraints = rhn.compute(mxs, lepton=lepton, progress=progress, gecco=False)
+        constraints = rhn.constrain(mxs, lepton=lepton, progress=progress, gecco=False)
         constraints["masses"] = mxs
         constraints["gecco"] = {
             key: {
@@ -143,7 +167,7 @@ def rh_neutrino(prefix, filename, mx_min, mx_max, lepton, sigmas, overwrite):
             for key in rhn._gecco_targets.keys()
         }
         for sigma in sigmas:
-            geccos_ = rhn.compute(
+            geccos_ = rhn.constrain(
                 mxs,
                 sigma=sigma,
                 lepton=lepton,
@@ -158,7 +182,7 @@ def rh_neutrino(prefix, filename, mx_min, mx_max, lepton, sigmas, overwrite):
 
 
 def single_channel(decay, prefix, filename, sigmas, overwrite):
-    singlechannel = SingleChannelConstraints()
+    singlechannel = SingleChannelConstrainer(decay)
     masses = {
         "e e": np.geomspace(me, 1e4, 100),
         "mu mu": np.geomspace(mmu, 1e4, 100),
@@ -169,11 +193,11 @@ def single_channel(decay, prefix, filename, sigmas, overwrite):
     constraints = {}
     with Progress(transient=True) as progress:
         for fs, mxs in masses.items():
-            constraints[fs] = singlechannel.compute(
+            constraints[fs] = singlechannel.constrain(
                 mxs, fs, decay=decay, progress=progress, gecco=False, cmb=cmb
             )
             constraints[fs]["masses"] = mxs
-            targets = gecco_targets_dec() if decay else gecco_targets_ann()
+            targets = single_channel._gecco_targets
             constraints[fs]["gecco"] = {
                 key: {
                     "sigma": [],
@@ -182,7 +206,7 @@ def single_channel(decay, prefix, filename, sigmas, overwrite):
                 for key in targets.keys()
             }
             for sigma in sigmas:
-                geccos_ = singlechannel.compute(
+                geccos_ = singlechannel.constrain(
                     mxs,
                     fs,
                     decay=decay,
@@ -194,6 +218,29 @@ def single_channel(decay, prefix, filename, sigmas, overwrite):
                 for target, svs in geccos_.items():
                     constraints[fs]["gecco"][target]["sigma"].append(sigma)
                     constraints[fs]["gecco"][target]["limits"].append(svs)
+
+    write_data(prefix, filename, constraints, overwrite)
+
+
+def pbh(prefix, filename, sigmas, overwrite):
+    pbh = PbhConstrainer()
+    with Progress(transient=True) as progress:
+        constraints = pbh.constrain(progress=progress, gecco=False, include_masses=True)
+        constraints["gecco"] = {
+            key: {
+                "sigma": [],
+                "limits": [],
+            }
+            for key in pbh._gecco_targets.keys()
+        }
+        for sigma in sigmas:
+            geccos_ = pbh.constrain(
+                progress=progress,
+                existing=False,
+            )
+            for target, svs in geccos_.items():
+                constraints["gecco"][target]["sigma"].append(sigma)
+                constraints["gecco"][target]["limits"].append(svs)
 
     write_data(prefix, filename, constraints, overwrite)
 

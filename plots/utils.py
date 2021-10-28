@@ -2,6 +2,12 @@ from cycler import cycler
 from typing import Optional, Tuple, Union
 from abc import ABC, abstractmethod
 
+import numpy as np
+
+from matplotlib.ticker import LogLocator, NullFormatter
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
+
 LineStyleType = Union[str, Tuple[int, Tuple[int, ...]]]
 
 BLUE = "#1f77b4"
@@ -122,23 +128,122 @@ MPL_COLORS = cycler(
     ]
 )
 
-MPL_LINESTYLES = {
-    "solid": (0, (1, 0)),
-    "dashdot": (0, (5, 1, 1, 1)),
-    "loosely dotted": (0, (1, 10)),
-    "loosely dotted": (0, (1, 10)),
-    "dotted": (0, (1, 1)),
-    "densely dotted": (0, (1, 1)),
-    "loosely dashed": (0, (5, 10)),
-    "dashed": (0, (5, 5)),
-    "densely dashed": (0, (5, 1)),
-    "loosely dashdotted": (0, (3, 10, 1, 10)),
-    "dashdotted": (0, (3, 5, 1, 5)),
-    "densely dashdotted": (0, (3, 1, 1, 1)),
-    "dashdotdotted": (0, (3, 5, 1, 5, 1, 5)),
-    "loosely dashdotdotted": (0, (3, 10, 1, 10, 1, 10)),
-    "densely dashdotdotted": (0, (3, 1, 1, 1, 1, 1)),
-}
+
+def get_gecco_keys(datafile):
+    return list(filter(lambda k: "gecco" in k, list(datafile.keys())))
+
+
+def strip_gecco(key: str):
+    return key.replace("gecco-", "")
+
+
+def add_gecco(axis, masses, datafile, decay=False, upper_band=5, lower_band=25):
+    for key in get_gecco_keys(datafile):
+        conf = {"color": COLOR_DICT[strip_gecco(key)]}
+        c1 = (upper_band / 5) * datafile[key][:]
+        c2 = (lower_band / 5) * datafile[key][:]
+        if decay:
+            c1 = 1 / c1
+            c2 = 1 / c2
+
+        avg = np.exp(np.log(c1 * c2) / 2.0)
+        axis.fill_between(masses, c1, c2, lw=0, alpha=0.4, **conf)
+        axis.plot(masses, avg, lw=1.5, **conf)
+        axis.plot(masses, c1, lw=0.0, alpha=0.3, ls="-", **conf)
+        axis.plot(masses, c2, lw=0.0, alpha=0.3, ls="-", **conf)
+
+
+def existing_outline(datafile, decay=False):
+    egret = datafile["egret"][:]
+    comptel = datafile["comptel"][:]
+    fermi = datafile["fermi"][:]
+    integral = datafile["integral"][:]
+    outline = np.array(
+        [np.min([e, c, f, i]) for e, c, f, i in zip(egret, comptel, fermi, integral)]
+    )
+    if decay:
+        return 1 / outline
+    return outline
+
+
+def add_existing_outline(axis, masses, ylims, datafile, decay=False, **options):
+    outline = existing_outline(datafile, decay)
+    outline = np.clip(outline, np.min(ylims), np.max(ylims))
+
+    if decay:
+        y2 = np.min(ylims)
+    else:
+        y2 = np.max(ylims)
+
+    alpha = options.get("alpha", 0.5)
+    axis.fill_between(masses, outline, y2, alpha=alpha)
+    axis.plot(masses, outline)
+
+
+def configure_ticks(axis, minor_ticks="both"):
+    axis.tick_params(axis="both", which="both", direction="in", width=0.9, labelsize=12)
+    if minor_ticks in ["y", "both"]:
+        axis.yaxis.set_minor_locator(
+            LogLocator(base=10, subs=[i * 0.1 for i in range(1, 10)], numticks=100)
+        )
+        axis.yaxis.set_minor_formatter(NullFormatter())
+    if minor_ticks in ["x", "both"]:
+        axis.xaxis.set_minor_locator(
+            LogLocator(base=10, subs=[i * 0.1 for i in range(1, 10)], numticks=100)
+        )
+        axis.xaxis.set_minor_formatter(NullFormatter())
+
+
+def add_xy_grid(axis, alpha=0.5):
+    axis.grid(True, axis="y", which="major", alpha=alpha)
+    axis.grid(True, axis="x", which="major", alpha=alpha)
+
+
+CMB_HANDLE = Line2D([0], [0], color="k", label=LABEL_DICT["cmb"], ls="--", lw=1)
+RD_HANDLE = Line2D([0], [0], color="k", label=LABEL_DICT["rd"], ls="dotted", lw=1)
+PHENO_HANDLE = Patch(color=COLOR_DICT["pheno"], label=LABEL_DICT["pheno"], alpha=0.3)
+EXISTING_HANDLE = Patch(
+    color=COLOR_DICT["existing"], label=LABEL_DICT["existing"], alpha=0.3
+)
+
+
+def gecco_handle(name):
+    return Line2D(
+        [0],
+        [0],
+        color=COLOR_DICT[name],
+        label="GECCO" + LABEL_DICT[name],
+        alpha=1,
+    )
+
+
+def get_legend_handles(datafile, **kwargs):
+    handles = []
+    if kwargs.get("cmb", False):
+        handles.append(CMB_HANDLE)
+    if kwargs.get("rd", False):
+        handles.append(RD_HANDLE)
+    for key in get_gecco_keys(datafile):
+        handles.append(gecco_handle(strip_gecco(key)))
+    if kwargs.get("pheno", False):
+        handles.append(PHENO_HANDLE)
+    if kwargs.get("existing", False):
+        handles.append(EXISTING_HANDLE)
+    return handles
+
+
+def make_legend_axis(axis, datafile, **kwargs):
+    handles = get_legend_handles(datafile, **kwargs)
+
+    axis.clear()
+    axis.set_axis_off()
+    axis.legend(handles=handles, loc="center", fontsize=10)
+
+
+def add_legend(axis, datafile, **kwargs):
+    handles = get_legend_handles(datafile, **kwargs)
+
+    axis.legend(handles=handles, **kwargs)
 
 
 class MatPlotLibConfig:

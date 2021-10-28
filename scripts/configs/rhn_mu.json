@@ -1,9 +1,0 @@
-{
-  "model": "rh-neutrino",
-  "lepton": "mu",
-  "mx-min": 0.1,
-  "mx-max": 500.0,
-  "filename": "rhn_mu",
-  "sigma": [5.0, 25.0],
-  "overwrite": false
-}

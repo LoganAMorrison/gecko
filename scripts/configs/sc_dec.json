@@ -1,6 +1,0 @@
-{
-  "model": "single-channel-dec",
-  "filename": "single_channel_dec",
-  "sigma": [5.0, 25.0],
-  "overwrite": false
-}

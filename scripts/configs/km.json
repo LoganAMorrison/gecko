@@ -1,9 +1,0 @@
-{
-  "model": "kinetic-mixing",
-  "mass-ratio": 3.0,
-  "mx-min": 0.1,
-  "mx-max": 250.0,
-  "filename": "kinetic_mixing",
-  "sigma": [5.0, 25.0],
-  "overwrite": false
-}

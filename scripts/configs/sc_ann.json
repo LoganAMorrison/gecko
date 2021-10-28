@@ -1,6 +1,0 @@
-{
-  "model": "single-channel-ann",
-  "filename": "single_channel_ann",
-  "sigma": [5.0, 25.0],
-  "overwrite": false
-}

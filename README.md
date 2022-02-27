@@ -163,5 +163,6 @@ Scripts for generating the plots are located in the `plots/` directory. The
 plots can be generated just by running python on them. For example:
 
 ```sh
-poetry run python -m plot_higgs_portal.py
+cd plots
+poetry run python plot_higgs_portal.py
 ```

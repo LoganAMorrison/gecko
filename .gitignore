@@ -191,5 +191,5 @@ cython_debug/
 
 notebooks/
 results/*
-plots/figures/*
+plots/figures/*.pdf
 scripts/
